@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Test / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Model artifacts (never commit real models)
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+!tests/fixtures/**  # allow small, sanitized test fixtures only
+
+# BOM outputs
+*.bom.json
+bom.json
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
