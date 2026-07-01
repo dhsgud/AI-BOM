@@ -73,6 +73,14 @@ aibom scan ./model.safetensors --until stage3 --output bom.json
 | `WARNING` | 의심 신호 존재(미확인 opcode, 원격 해시 불일치 등) — 사람 검토 권장 |
 | `BLOCK` | 실행 가능 페이로드·악성 트리거 등 명확한 위협 — 사용 차단 |
 
+## 저작권 고지 (Attribution)
+
+AI-BOM의 **Stage 1**은 GGUF 정적 감사기
+[**c4nary**](https://github.com/paraxaQQ/canary) (© 2026 Actual Intelligence LLC,
+**MIT**)을 사용합니다. 전체 라이선스 원문과 서드파티 고지는
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 참조하세요.
+
 ## 라이선스
 
-[Apache License 2.0](LICENSE)
+[Apache License 2.0](LICENSE) — 단, 번들/의존하는 서드파티 구성요소는 각자의
+라이선스를 따릅니다([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
