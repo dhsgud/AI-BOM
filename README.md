@@ -22,40 +22,39 @@
 
 ## 파이프라인
 
-```
-model.gguf / model.bin / model.safetensors
-         │
-         ▼
-  Stage 1  c4nary scan        GGUF 템플릿 백도어/SSTI·메타·구조·토크나이저 정적 룰 (c4nary 통합)
-         │ (non-GGUF)
-         ▼
-  Stage 2  Format Scanner     picklescan opcode 분석 · safetensors 검증 · 실행코드 탐지 (신규)
-         │
-         ▼
-  Stage 3  Docker Sandbox     --network none + seccomp · 격리 로드 · strace FS 모니터링
-         │ (선택적)
-         ▼
-  Stage 4  Behavioral Test    (샌드박스 내) FGSM/PGD adversarial probe · anomaly 스코어 (신규)
-         │
-         ▼
-  Stage 5  AI-BOM Report      CycloneDX ML-BOM JSON · SAFE / WARNING / BLOCK
-```
+<p align="center">
+  <img src="assets/pipeline.svg" alt="AI-BOM 5-stage pipeline" width="640">
+</p>
 
 > Stage 1은 GGUF 전용 정적 감사기 [`c4nary`](https://github.com/paraxaQQ/canary)를
 > 통합합니다(파서 재구현 아님). Stage 2(pickle/safetensors)와 Stage 4(가중치 행위
-> 분석)는 c4nary 범위 밖이라 신규 개발합니다. Stage 4는 유일하게 모델을 실행하므로
-> **반드시 Stage 3 샌드박스 안에서만** 동작합니다.
+> 분석)는 c4nary 범위 밖이라 신규 개발합니다. Stage 3~4는 유일하게 모델을 실행하므로
+> **반드시 Docker 샌드박스 안에서만** 동작합니다.
 
 각 단계의 상세 설계는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 개발 일정·마일스톤은 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)를 참조하세요.
 
-## 빠른 시작 (예정)
+## 구현 상태
+
+| Stage | 내용 | 상태 |
+|-------|------|:----:|
+| 1 · c4nary scan | GGUF 템플릿 백도어/SSTI·메타·구조·토크나이저 (정적) | ✅ |
+| 2 · Format Scanner | picklescan opcode · safetensors 헤더 검증 (정적) | ✅ |
+| 3 · Docker Sandbox | 격리 로드 + strace probe (동적) | ✅ |
+| 4 · Behavioral Test | FGSM/PGD adversarial probe (샌드박스 내) | ⬜ 계획 |
+| 5 · AI-BOM Report | CycloneDX 1.6 ML-BOM 직렬화 | ✅ |
+
+정적(Stage 1–2)과 동적(Stage 3) 계층이 함께 위협을 확정하며, 결과는 다른 공급망
+보안 도구가 소비 가능한 표준 CycloneDX ML-BOM으로 나옵니다.
+샘플 출력: [examples/example-report.cyclonedx.json](examples/example-report.cyclonedx.json).
+
+## 빠른 시작
 
 ```bash
 # 설치 (개발 모드)
 pip install -e .
 
-# 단일 모델 스캔
+# 단일 모델 스캔 (BLOCK 시 종료코드 1 — CI 게이트에 사용)
 aibom scan ./model.gguf
 
 # 특정 단계까지만 실행 + BOM 출력
@@ -71,16 +70,16 @@ pip install -e ".[sandbox]"                    # docker SDK
 docker build -t aibom-sandbox:latest sandbox/  # strace 기반 로드 probe 이미지
 ```
 
-> ⚠️ **알파 단계** — 현재 아키텍처/스캐폴드만 구현되어 있습니다.
-> 실행 가능한 기능은 [개발 계획](docs/DEVELOPMENT_PLAN.md)의 마일스톤에 따라 추가됩니다.
+> ⚠️ **알파 단계** — Stage 1·2·3·5가 동작하며, Stage 4(행위 분석)는 계획 단계입니다.
+> 진행 상황은 [개발 계획](docs/DEVELOPMENT_PLAN.md)의 마일스톤을 참조하세요.
 
 ## 판정 기준
 
 | 판정 | 의미 |
 |------|------|
-| `SAFE` | 알려진 위협 미탐지, 모든 무결성 검증 통과 |
-| `WARNING` | 의심 신호 존재(미확인 opcode, 원격 해시 불일치 등) — 사람 검토 권장 |
-| `BLOCK` | 실행 가능 페이로드·악성 트리거 등 명확한 위협 — 사용 차단 |
+| `SAFE` | 알려진 위협 미탐지, 모든 단계 통과 (샌드박스 포함 완전 검증) |
+| `WARNING` | 휴리스틱 의심 신호, 또는 어떤 단계가 skip됨(예: Docker 미가용) — 사람 검토 권장 |
+| `BLOCK` | 실행 가능 페이로드·악성 트리거 등 명확한 위협(HIGH/CRITICAL) — 사용 차단 |
 
 ## 저작권 고지 (Attribution)
 

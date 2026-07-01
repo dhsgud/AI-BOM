@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1180" viewBox="0 0 960 1180" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="1180" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="480" y="52" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">AI-BOM</text>
+  <text x="480" y="80" text-anchor="middle" font-size="15" fill="#475569">AI Model Security Scanner &#183; 5-Stage Pipeline &#8594; CycloneDX ML-BOM</text>
+
+  <!-- Input -->
+  <g filter="url(#shadow)">
+    <rect x="270" y="104" width="420" height="52" rx="26" fill="#0f172a"/>
+  </g>
+  <text x="480" y="136" text-anchor="middle" font-size="15" font-weight="600" fill="#e2e8f0">model.gguf &#8226; model.bin &#8226; model.safetensors</text>
+  <line x1="480" y1="156" x2="480" y2="192" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- Stage 1 -->
+  <g filter="url(#shadow)">
+    <rect x="150" y="196" width="660" height="118" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  </g>
+  <rect x="150" y="196" width="8" height="118" rx="4" fill="#6366f1"/>
+  <text x="182" y="230" font-size="19" font-weight="700" fill="#0f172a">Stage 1 &#183; c4nary scan</text>
+  <text x="182" y="255" font-size="13.5" fill="#475569">GGUF static analysis (never rendered / executed) &#8212; integrates c4nary</text>
+  <text x="182" y="279" font-size="12.5" fill="#334155">template backdoor / SSTI &#8226; metadata &#8226; structure &#8226; tokenizer &#8226; integrity</text>
+  <text x="182" y="300" font-size="12" fill="#64748b">FAIL/WARN/INFO &#8594; AI-BOM severity (SSTI/injection &#8594; CRITICAL)</text>
+  <rect x="686" y="212" width="104" height="26" rx="13" fill="#dcfce7"/>
+  <text x="738" y="230" text-anchor="middle" font-size="12.5" font-weight="700" fill="#166534">DONE</text>
+
+  <!-- routing note -->
+  <line x1="480" y1="314" x2="480" y2="342" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="500" y="334" font-size="12" font-style="italic" fill="#64748b">non-GGUF &#8594; Stage 2</text>
+
+  <!-- Stage 2 -->
+  <g filter="url(#shadow)">
+    <rect x="150" y="346" width="660" height="118" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  </g>
+  <rect x="150" y="346" width="8" height="118" rx="4" fill="#0ea5e9"/>
+  <text x="182" y="380" font-size="19" font-weight="700" fill="#0f172a">Stage 2 &#183; Format Scanner</text>
+  <text x="182" y="405" font-size="13.5" fill="#475569">pickle &amp; safetensors &#8212; the formats c4nary does not cover</text>
+  <text x="182" y="429" font-size="12.5" fill="#334155">picklescan opcode/global scan (no unpickle) &#8226; safetensors header validation</text>
+  <text x="182" y="450" font-size="12" fill="#64748b">dangerous global &#8594; CRITICAL &#8226; offset/overlap/size violation &#8594; HIGH</text>
+  <rect x="686" y="362" width="104" height="26" rx="13" fill="#dcfce7"/>
+  <text x="738" y="380" text-anchor="middle" font-size="12.5" font-weight="700" fill="#166534">DONE</text>
+
+  <line x1="480" y1="464" x2="480" y2="492" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- Stage 3 -->
+  <g filter="url(#shadow)">
+    <rect x="150" y="496" width="660" height="118" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  </g>
+  <rect x="150" y="496" width="8" height="118" rx="4" fill="#f59e0b"/>
+  <text x="182" y="530" font-size="19" font-weight="700" fill="#0f172a">Stage 3 &#183; Docker Sandbox</text>
+  <text x="182" y="555" font-size="13.5" fill="#475569">isolated load test &#8212; the only place untrusted code runs</text>
+  <text x="182" y="579" font-size="12.5" fill="#334155">--network none &#8226; read-only &#8226; cap-drop ALL &#8226; strace load probe</text>
+  <text x="182" y="600" font-size="12" fill="#64748b">process spawn &#8594; CRITICAL &#8226; network / filesystem write &#8594; HIGH</text>
+  <rect x="686" y="512" width="104" height="26" rx="13" fill="#dcfce7"/>
+  <text x="738" y="530" text-anchor="middle" font-size="12.5" font-weight="700" fill="#166534">DONE</text>
+
+  <line x1="480" y1="614" x2="480" y2="642" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="500" y="634" font-size="12" font-style="italic" fill="#94a3b8">optional</text>
+
+  <!-- Stage 4 (planned) -->
+  <g filter="url(#shadow)">
+    <rect x="150" y="646" width="660" height="104" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="6 5"/>
+  </g>
+  <rect x="150" y="646" width="8" height="104" rx="4" fill="#94a3b8"/>
+  <text x="182" y="680" font-size="19" font-weight="700" fill="#475569">Stage 4 &#183; Behavioral Test</text>
+  <text x="182" y="705" font-size="13.5" fill="#64748b">FGSM/PGD adversarial probe &#8212; runs inside the Stage 3 sandbox</text>
+  <text x="182" y="729" font-size="12.5" fill="#94a3b8">trigger extraction from GGUF template AST &#8226; anomaly scoring</text>
+  <rect x="686" y="662" width="104" height="26" rx="13" fill="#e2e8f0"/>
+  <text x="738" y="680" text-anchor="middle" font-size="12.5" font-weight="700" fill="#64748b">PLANNED</text>
+
+  <line x1="480" y1="750" x2="480" y2="778" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- Stage 5 -->
+  <g filter="url(#shadow)">
+    <rect x="150" y="782" width="660" height="104" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  </g>
+  <rect x="150" y="782" width="8" height="104" rx="4" fill="#10b981"/>
+  <text x="182" y="816" font-size="19" font-weight="700" fill="#0f172a">Stage 5 &#183; AI-BOM Report</text>
+  <text x="182" y="841" font-size="13.5" fill="#475569">CycloneDX 1.6 ML-BOM (deterministic JSON)</text>
+  <text x="182" y="865" font-size="12.5" fill="#334155">model = machine-learning-model component &#8226; findings &#8594; vulnerabilities</text>
+  <rect x="686" y="798" width="104" height="26" rx="13" fill="#dcfce7"/>
+  <text x="738" y="816" text-anchor="middle" font-size="12.5" font-weight="700" fill="#166534">DONE</text>
+
+  <line x1="480" y1="886" x2="480" y2="922" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- Verdict pills -->
+  <g filter="url(#shadow)">
+    <rect x="214" y="926" width="160" height="52" rx="26" fill="#dcfce7"/>
+    <rect x="400" y="926" width="160" height="52" rx="26" fill="#fef3c7"/>
+    <rect x="586" y="926" width="160" height="52" rx="26" fill="#fee2e2"/>
+  </g>
+  <text x="294" y="958" text-anchor="middle" font-size="17" font-weight="700" fill="#166534">SAFE</text>
+  <text x="480" y="958" text-anchor="middle" font-size="17" font-weight="700" fill="#92400e">WARNING</text>
+  <text x="666" y="958" text-anchor="middle" font-size="17" font-weight="700" fill="#991b1b">BLOCK</text>
+
+  <!-- Invariant footer -->
+  <rect x="150" y="1024" width="660" height="120" rx="14" fill="#0f172a"/>
+  <text x="180" y="1058" font-size="14.5" font-weight="700" fill="#e2e8f0">Core invariant</text>
+  <text x="180" y="1084" font-size="13" fill="#cbd5e1">Untrusted models are never executed on the host. Analysis is static</text>
+  <text x="180" y="1104" font-size="13" fill="#cbd5e1">(opcode / AST inspection) or fully isolated (Stage 3 Docker sandbox).</text>
+  <text x="180" y="1128" font-size="12" fill="#94a3b8">Static (Stage 1&#8211;2) and dynamic (Stage 3) layers corroborate before a BLOCK.</text>
+</svg>

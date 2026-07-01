@@ -1,0 +1,148 @@
+{
+  "dependencies": [
+    {
+      "ref": "model"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "model",
+      "name": "example-model.gguf",
+      "properties": [
+        {
+          "name": "aibom:sha256",
+          "value": "5d97f08c75941f3a8e5e6f52e9127db1289e78ba2dcf88168989d7cac55d79c8"
+        },
+        {
+          "name": "aibom:template_sha256",
+          "value": "07a3e7539bb4b4585409e3181a46d42451a2fea49403ad013429538ff4c71dd1"
+        }
+      ],
+      "type": "machine-learning-model"
+    },
+    "properties": [
+      {
+        "name": "aibom:verdict",
+        "value": "BLOCK"
+      }
+    ]
+  },
+  "version": 1,
+  "vulnerabilities": [
+    {
+      "affects": [
+        {
+          "ref": "model"
+        }
+      ],
+      "bom-ref": "finding-2",
+      "description": "String metadata field",
+      "detail": "{\"c4nary_severity\": \"INFO\", \"detail\": \"general.architecture = 'llama'\", \"location\": \"general.architecture\"}",
+      "id": "c4nary:MET004",
+      "properties": [
+        {
+          "name": "aibom:stage",
+          "value": "stage1"
+        }
+      ],
+      "ratings": [
+        {
+          "severity": "info",
+          "source": {
+            "name": "AI-BOM"
+          }
+        }
+      ],
+      "source": {
+        "name": "AI-BOM"
+      }
+    },
+    {
+      "affects": [
+        {
+          "ref": "model"
+        }
+      ],
+      "bom-ref": "finding-3",
+      "description": "String metadata field",
+      "detail": "{\"c4nary_severity\": \"INFO\", \"detail\": \"general.name = 'example-poisoned'\", \"location\": \"general.name\"}",
+      "id": "c4nary:MET004",
+      "properties": [
+        {
+          "name": "aibom:stage",
+          "value": "stage1"
+        }
+      ],
+      "ratings": [
+        {
+          "severity": "info",
+          "source": {
+            "name": "AI-BOM"
+          }
+        }
+      ],
+      "source": {
+        "name": "AI-BOM"
+      }
+    },
+    {
+      "affects": [
+        {
+          "ref": "model"
+        }
+      ],
+      "bom-ref": "finding-0",
+      "description": "Content-gated instruction injection",
+      "detail": "{\"c4nary_severity\": \"FAIL\", \"detail\": \"A content-keyed branch also emits imperative instruction text not sourced from the conversation (content trigger + injected instruction).\", \"location\": \"template:L1\"}",
+      "id": "c4nary:TPL021",
+      "properties": [
+        {
+          "name": "aibom:stage",
+          "value": "stage1"
+        }
+      ],
+      "ratings": [
+        {
+          "severity": "critical",
+          "source": {
+            "name": "AI-BOM"
+          }
+        }
+      ],
+      "source": {
+        "name": "AI-BOM"
+      }
+    },
+    {
+      "affects": [
+        {
+          "ref": "model"
+        }
+      ],
+      "bom-ref": "finding-1",
+      "description": "Hidden instruction-like text",
+      "detail": "{\"c4nary_severity\": \"WARN\", \"detail\": \"Template emits imperative instruction-like text not sourced from the conversation (e.g. 'ignore previous') - possible hidden instruction injection; manual review, not proof of malice.\", \"location\": \"template:text\"}",
+      "id": "c4nary:TPL023",
+      "properties": [
+        {
+          "name": "aibom:stage",
+          "value": "stage1"
+        }
+      ],
+      "ratings": [
+        {
+          "severity": "medium",
+          "source": {
+            "name": "AI-BOM"
+          }
+        }
+      ],
+      "source": {
+        "name": "AI-BOM"
+      }
+    }
+  ],
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6"
+}
