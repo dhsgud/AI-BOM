@@ -7,8 +7,23 @@ are. In any CI without the sandbox extra / daemon, run() takes the skip path.
 
 from pathlib import Path
 
+import pytest
+
 from aibom.models import Severity
 from aibom.stages import stage3_sandbox as s3
+
+
+def _sandbox_image_ready() -> bool:
+    """True only when Docker is reachable and the aibom-sandbox image is built."""
+    ok, _ = s3.sandbox_available()
+    if not ok:
+        return False
+    try:
+        import docker
+        docker.from_env().images.get(s3.DEFAULT_IMAGE)
+        return True
+    except Exception:
+        return False
 
 
 def test_hardening_flags():
@@ -67,10 +82,38 @@ def test_sandbox_available_returns_reason():
     assert isinstance(ok, bool) and isinstance(reason, str) and reason
 
 
-def test_run_skips_safely_without_sandbox(tmp_path):
+def test_run_skips_safely_without_sandbox(tmp_path, monkeypatch):
+    # Force unavailability so the gating logic is tested regardless of whether
+    # this machine happens to have Docker running.
+    monkeypatch.setattr(s3, "sandbox_available", lambda: (False, "no docker (test)"))
     art = tmp_path / "m.gguf"
     art.write_bytes(b"GGUF\x03\x00\x00\x00")
     result = s3.run(art)
-    # No daemon/extra in the test env -> safe skip that drives a WARNING verdict.
+    # Unavailable sandbox -> safe skip that drives a WARNING verdict.
     assert result.skipped is True
     assert result.findings[0].rule_id == "stage3.skipped"
+
+
+@pytest.mark.skipif(not _sandbox_image_ready(),
+                    reason="requires Docker daemon + built aibom-sandbox image")
+def test_sandbox_detonates_malicious_pickle_live(tmp_path):
+    """Live container run: an os.system pickle must trip process-spawn (CRITICAL)."""
+    # Protocol-0 pickle: os.system("echo pwned"). Detonates only inside the sandbox.
+    evil = tmp_path / "evil.pkl"
+    evil.write_bytes(b"cos\nsystem\n(S'echo pwned'\ntR.")
+    result = s3.run(evil)
+    assert result.skipped is False
+    assert any(f.rule_id == "sandbox.process-spawn" and f.severity == Severity.CRITICAL
+               for f in result.findings)
+
+
+@pytest.mark.skipif(not _sandbox_image_ready(),
+                    reason="requires Docker daemon + built aibom-sandbox image")
+def test_sandbox_clean_load_no_findings_live(tmp_path):
+    """Live container run: a benign pickle loads cleanly with no anomalies."""
+    import pickle
+    clean = tmp_path / "clean.pkl"
+    clean.write_bytes(pickle.dumps({"weights": [1, 2, 3]}))
+    result = s3.run(clean)
+    assert result.skipped is False
+    assert result.findings == []

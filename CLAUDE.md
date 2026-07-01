@@ -22,9 +22,14 @@ pytest --cov=aibom             # with coverage
 pytest tests/test_verdict.py::test_block_on_high_or_critical  # single test
 
 aibom scan ./model.gguf --until stage3 --output bom.json  # run the CLI
+
+pip install -e ".[sandbox]"                    # Stage 3: docker SDK
+docker build -t aibom-sandbox:latest sandbox/  # Stage 3 probe image (strace loader)
 ```
 
-CI (`.github/workflows/ci.yml`) runs ruff + mypy + pytest on 3.11.
+CI (`.github/workflows/ci.yml`) runs ruff + mypy + pytest on 3.11. The Stage 3
+live-container tests (`*_live`) auto-skip unless Docker is running AND the
+`aibom-sandbox:latest` image is built — so normal CI (no Docker) skips them.
 
 ## Architecture
 
@@ -42,7 +47,7 @@ To add a **new stage/format**: implement `run()` returning a `StageResult`, regi
 Stage 1 integrates [c4nary](https://github.com/paraxaQQ/canary) (MIT), a **GGUF-only** static auditor, via its Python API or `canary scan --json`. Do **not** rewrite a GGUF parser. Key facts that shape the design:
 - c4nary covers **only GGUF** (template SSTI + behavioral-backdoor, metadata, structure, tokenizer, integrity rules). pickle/safetensors/weight execution are explicitly out of its scope — that's why Stage 2 (pickle/safetensors) and Stage 4 (behavioral) are new work here.
 - Its severity is `FAIL/WARN/INFO`; map to AI-BOM `Severity` as FAIL→HIGH (SSTI/injection→CRITICAL), WARN→MEDIUM/LOW, INFO→INFO. Preserve rule ids as `c4nary:<RULE_ID>`.
-- c4nary never renders templates or runs models; its SHA-256 is for local manifest drift, and `--remote` only range-fetches HuggingFace headers (no weights). Stage 4 is the sole stage that executes a model, and only inside the Stage 3 sandbox.
+- c4nary never renders templates or runs models; its SHA-256 is for local manifest drift, and `--remote` only range-fetches HuggingFace headers (no weights). Stages 3–4 are the only stages that execute untrusted model content, and they do so exclusively inside the hardened Docker sandbox (`sandbox/`, image `aibom-sandbox:latest`) — Stage 3 loads the model under strace, Stage 4 (future) would run inference there too. The host never executes it.
 
 ## Non-negotiable invariant
 

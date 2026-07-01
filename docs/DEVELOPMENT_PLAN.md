@@ -98,20 +98,24 @@ aibom/
 - **라우팅:** GGUF/미인식 포맷은 통과. **탐지 근거:** 임의 코드 실행 global, 크래프트된 헤더.
 - E2E 검증: 악성 pickle(`os.system`)→**BLOCK**. 단위+통합 테스트 통과(총 21 테스트).
 
-### Stage 3 — Docker Sandbox (격리 로드 테스트) — **M4 부분 완료**
-- **완료(구현·테스트):**
-  - `build_run_kwargs()` — 하드닝된 docker run 설정을 만드는 순수 함수:
-    `network_mode=none` + `network_disabled`, `read_only` rootfs, `cap_drop=[ALL]`,
-    `no-new-privileges`(+ 선택 seccomp), 비-privileged, mem/pids/cpu 제한, 모델은
-    read-only 바인드, 쓰기는 `/tmp` tmpfs만.
-  - `translate_probe_report()` — probe의 구조화 리포트를 findings로 변환: 프로세스
-    생성→`CRITICAL`, 네트워크 시도/파일 쓰기→`HIGH`, oom/timeout/load-error→`MEDIUM`.
-  - `sandbox_available()` 게이팅 — SDK 미설치/데몬 다운 시 안전하게 skip(사유 포함),
-    verdict는 보수적으로 WARNING. E2E로 skip 경로 확인.
-- **후속(TODO):** 컨테이너 안에서 `strace`로 모델을 **로드만** 시도(추론 없음)하고
-  구조화 리포트를 stdout으로 내보내는 **probe 이미지**(`aibom-sandbox`) 빌드. 이미지가
-  없거나 실행 실패 시 현재는 안전 skip.
-- **탐지:** 예기치 않은 파일 쓰기, 네트워크 시도, 프로세스 생성
+### Stage 3 — Docker Sandbox (격리 로드 테스트) — **M4 완료**
+- **하드닝(`build_run_kwargs()`):** `network_mode=none` + `network_disabled`,
+  `read_only` rootfs, `cap_drop=[ALL]`, `no-new-privileges`(+ 선택 seccomp),
+  비-privileged, mem/pids/cpu 제한, 모델은 read-only 바인드, 쓰기는 `/tmp` tmpfs만.
+- **probe 이미지(`sandbox/Dockerfile` + `probe.py`):** python:3.12-slim + strace,
+  non-root(uid 10001). probe는 자신을 `strace`로 재실행해 모델을 **로드만**(추론 없음)
+  시도하고, execve(프로세스 생성)·socket/connect(네트워크)·write-openat(파일쓰기)를
+  파싱해 JSON 리포트를 stdout으로 낸다. pickle은 격리 안에서 실제로 detonate시켜 관찰.
+  strace가 막히면 untraced 로드로 폴백(`traced:false`).
+- **변환(`translate_probe_report()`):** 프로세스 생성→`CRITICAL`, 네트워크/파일쓰기
+  →`HIGH`, oom/timeout/load-error→`MEDIUM`.
+- **게이팅(`sandbox_available()`):** SDK 미설치/데몬 다운/이미지 부재 시 사유와 함께
+  안전 skip → 보수적 WARNING.
+- **라이브 검증(실 컨테이너):**
+  - `os.system` pickle → `sandbox.process-spawn`(CRITICAL) + `sandbox.filesystem-write`(HIGH)
+  - socket connect pickle → `sandbox.network-attempt`(HIGH, ENETUNREACH 로깅)
+  - 양성 GGUF/safetensors → 무탐지 → **드디어 `SAFE` 판정 가능**(샌드박스 skip이 없어짐)
+- **빌드:** `docker build -t aibom-sandbox:latest sandbox/`
 
 ### Stage 4 — Behavioral Test (선택, 연구성) — **주의: c4nary가 제공하지 않음**
 > ⚠️ 이 단계는 유일하게 **모델을 실제 실행**한다. 따라서 반드시 **Stage 3 샌드박스
@@ -153,7 +157,7 @@ aibom/
 | **M1** ✅ | Stage 5 | 실제 CycloneDX 1.6 ML-BOM 직렬화 (cyclonedx-python-lib) | 유효한 CycloneDX ML-BOM JSON |
 | **M2** ✅ | Stage 2 | picklescan + safetensors 헤더 validator | pickle 악성/변조 safetensors 탐지 |
 | **M3** ✅ | Stage 1 | **c4nary 통합** (Python API + Finding 매핑, severity 승격) | GGUF 룰 findings가 BOM에 반영 |
-| **M4** 🟡 | Stage 3 | 하드닝 설정·가용성 게이팅·리포트 변환 완료 / 라이브 컨테이너·probe 이미지는 후속 | 격리 로드 리포트 |
+| **M4** ✅ | Stage 3 | 하드닝 컨테이너 + strace probe 이미지 + 라이브 검증 | 격리 로드 리포트 |
 | **M5** | Stage 4 | 자체 트리거 추출기(`trigger_extract.py`) + adversarial probe (선택) | anomaly 스코어 |
 | **M6** | 통합 & 문서 | E2E 테스트·샘플 코퍼스·릴리스 | v0.1.0 태그 |
 

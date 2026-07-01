@@ -62,6 +62,15 @@ aibom scan ./model.gguf
 aibom scan ./model.safetensors --until stage3 --output bom.json
 ```
 
+**Stage 3 (Docker 샌드박스) 사용 시** — 격리 로드 probe 이미지를 먼저 빌드하세요.
+이미지가 없거나 Docker가 없으면 Stage 3는 안전하게 skip되고 판정은 보수적으로
+`WARNING`이 됩니다(이미지가 있으면 양성 모델이 `SAFE`로 인증될 수 있음).
+
+```bash
+pip install -e ".[sandbox]"                    # docker SDK
+docker build -t aibom-sandbox:latest sandbox/  # strace 기반 로드 probe 이미지
+```
+
 > ⚠️ **알파 단계** — 현재 아키텍처/스캐폴드만 구현되어 있습니다.
 > 실행 가능한 기능은 [개발 계획](docs/DEVELOPMENT_PLAN.md)의 마일스톤에 따라 추가됩니다.
 
