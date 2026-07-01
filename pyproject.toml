@@ -50,5 +50,10 @@ target-version = "py311"
 python_version = "3.11"
 strict = true
 
+# Third-party libraries without type stubs.
+[[tool.mypy.overrides]]
+module = ["c4nary.*", "picklescan.*", "safetensors.*", "cyclonedx.*", "docker.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

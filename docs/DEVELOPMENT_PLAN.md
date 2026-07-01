@@ -130,16 +130,25 @@ aibom/
 
 | # | 마일스톤 | 범위 | 산출물 |
 |---|----------|------|--------|
-| **M0** | 스캐폴드 & CI | repo·패키지·CI·CLI 골격 | `aibom --help`, 통과하는 파이프라인 스텁 |
-| **M1** | Stage 5 스켈레톤 | 빈 BOM 생성 + verdict 집계 | 유효한 CycloneDX JSON |
+| **M0** ✅ | 스캐폴드 & CI | repo·패키지·CI·CLI 골격 | `aibom --help`, 통과하는 파이프라인 스텁 |
+| **M1** 🟡 | Stage 5 스켈레톤 | 임시 BOM(dict) 생성 + verdict 집계 (cyclonedx-python-lib 미연동) | 유효한 JSON |
 | **M2** | Stage 2 | picklescan + safetensors validator | pickle 악성 샘플 탐지 |
-| **M3** | Stage 1 | **c4nary 통합** (라이브러리/CLI `--json` 호출 + Finding 매핑) | GGUF 룰 findings가 BOM에 반영 |
+| **M3** ✅ | Stage 1 | **c4nary 통합** (Python API + Finding 매핑, severity 승격) | GGUF 룰 findings가 BOM에 반영 |
 | **M4** | Stage 3 | Docker 샌드박스 + strace | 격리 로드 리포트 |
 | **M5** | Stage 4 | 자체 트리거 추출기(`trigger_extract.py`) + adversarial probe (선택) | anomaly 스코어 |
 | **M6** | 통합 & 문서 | E2E 테스트·샘플 코퍼스·릴리스 | v0.1.0 태그 |
 
 > **구현 순서 근거:** Stage 5→2 를 먼저 세워 "BOM 골격 + 확실한 위협 탐지"로
-> 빠르게 가치를 내고, 무거운 Stage 1(파서)·3(Docker)·4(ML)를 뒤에 배치한다.
+> 빠르게 가치를 내고, 무거운 Stage 3(Docker)·4(ML)를 뒤에 배치한다. Stage 1은
+> c4nary 통합(파서 신규개발 아님)이라 우선 완료했다.
+
+**M3 완료 내역 (Stage 1):** `is_gguf` 매직 라우팅 → non-GGUF는 Stage 2로 통과.
+GGUF는 c4nary Python API(`parse_gguf` + `analyze_template/metadata/tokenizer/
+structure`) 호출 후 Finding을 매핑(FAIL→HIGH, SSTI/injection FAIL→CRITICAL,
+WARN→MEDIUM, INFO→INFO; rule id는 `c4nary:<ID>` 보존). GGUF 매직인데 파싱 실패 시
+`stage1.parse-error`(HIGH). E2E 검증: 악성 템플릿 GGUF→**BLOCK**, 양성→WARNING(현재
+Stage 3 skip 때문). ruff/mypy(strict)/pytest 12개 통과.
+- **남은 것:** `--remote`(HuggingFace 헤더 스캔) aibom CLI 연동, manifest drift(INT) 연동.
 
 ---
 

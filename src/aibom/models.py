@@ -7,6 +7,7 @@ reference and produces a `StageResult`. See docs/ARCHITECTURE.md.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -32,7 +33,7 @@ class Finding(BaseModel):
     severity: Severity
     rule_id: str
     message: str
-    evidence: dict = Field(default_factory=dict)
+    evidence: dict[str, Any] = Field(default_factory=dict)
 
 
 class StageResult(BaseModel):
@@ -47,7 +48,7 @@ class StageResult(BaseModel):
     ok: bool = True
     skipped: bool = False
     findings: list[Finding] = Field(default_factory=list)
-    bom_fragment: dict | None = None
+    bom_fragment: dict[str, Any] | None = None
 
 
 class ScanReport(BaseModel):
@@ -56,4 +57,4 @@ class ScanReport(BaseModel):
     artifact: str
     verdict: Verdict
     stage_results: list[StageResult] = Field(default_factory=list)
-    bom: dict | None = None
+    bom: dict[str, Any] | None = None
