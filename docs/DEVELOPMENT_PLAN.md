@@ -122,12 +122,18 @@ aibom/
 - CPU 폴백 지원, `--behavioral` 플래그 + Docker 가용 시에만 활성 (비용·시간 큼)
 - 미구현/미가용 시 `WARNING`이 아니라 단순 skip(INFO)으로 처리해 오탐 방지
 
-### Stage 5 — AI-BOM Report
-- 모든 단계 findings + 아티팩트 메타데이터를 **CycloneDX ML-BOM(JSON)** 로 직렬화
-- **정정:** c4nary `report.py`는 단순 `Finding` dataclass + human/JSON 렌더러이며
-  CycloneDX가 아니다. 따라서 "확장"이 아니라 **c4nary Finding → CycloneDX 매핑**을
-  구현한다 (components=모델, `vulnerabilities`/`evidence`에 findings, 최종 verdict).
-- 최종 판정: 단계별 최고 심각도 → `SAFE / WARNING / BLOCK`
+### Stage 5 — AI-BOM Report — **M1 완료**
+- 모든 단계 findings + 아티팩트 메타데이터를 **CycloneDX 1.6 ML-BOM(JSON)** 으로 직렬화
+  (`cyclonedx-python-lib`, `build_bom()`).
+- 스캔 대상 모델 = `metadata.component`(type `machine-learning-model`), Stage 1이 낸
+  sha256/template_sha256는 컴포넌트 property로 첨부.
+- 각 finding = `Vulnerability`(id=rule_id, `ratings[].severity` 매핑, `affects`→모델,
+  `aibom:stage` property, evidence는 `detail` JSON). AI-BOM `Severity`→CycloneDX
+  severity는 이름 1:1.
+- 최종 판정 `SAFE/WARNING/BLOCK`는 `metadata` property `aibom:verdict`로 임베드.
+  Stage 5가 `prior`로부터 verdict를 계산하므로 BOM이 자기완결적.
+- **결정성:** 자동 생성되는 serial_number/timestamp를 제거해 동일 입력→동일 BOM
+  (c4nary 결정성 불변식과 정렬).
 
 ---
 
@@ -136,7 +142,7 @@ aibom/
 | # | 마일스톤 | 범위 | 산출물 |
 |---|----------|------|--------|
 | **M0** ✅ | 스캐폴드 & CI | repo·패키지·CI·CLI 골격 | `aibom --help`, 통과하는 파이프라인 스텁 |
-| **M1** 🟡 | Stage 5 스켈레톤 | 임시 BOM(dict) 생성 + verdict 집계 (cyclonedx-python-lib 미연동) | 유효한 JSON |
+| **M1** ✅ | Stage 5 | 실제 CycloneDX 1.6 ML-BOM 직렬화 (cyclonedx-python-lib) | 유효한 CycloneDX ML-BOM JSON |
 | **M2** ✅ | Stage 2 | picklescan + safetensors 헤더 validator | pickle 악성/변조 safetensors 탐지 |
 | **M3** ✅ | Stage 1 | **c4nary 통합** (Python API + Finding 매핑, severity 승격) | GGUF 룰 findings가 BOM에 반영 |
 | **M4** | Stage 3 | Docker 샌드박스 + strace | 격리 로드 리포트 |
