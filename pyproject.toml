@@ -22,7 +22,9 @@ dependencies = [
     "pydantic>=2.6",
     "c4nary>=0.1,<0.2",         # Stage 1: GGUF-only static auditor (MIT)
     "picklescan>=0.0.21",       # Stage 2: pickle opcode analysis (c4nary out-of-scope)
-    "safetensors>=0.4",         # Stage 2: safetensors header validation
+    # NOTE: safetensors headers are parsed directly from bytes (stage2_format.py)
+    # rather than via the safetensors lib — auditing must not load the file
+    # through the very backend it distrusts.
     "cyclonedx-python-lib>=8.0",
     "httpx>=0.27",
 ]

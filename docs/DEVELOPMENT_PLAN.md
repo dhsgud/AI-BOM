@@ -86,12 +86,17 @@ aibom/
 - **AI-BOM 매핑:** c4nary `FAIL/WARN/INFO` → AI-BOM `Severity`(아래 §9 매핑표)
 - **non-GGUF 포맷은 통과시켜 Stage 2로 위임** (c4nary는 pickle/safetensors 미지원)
 
-### Stage 2 — Format Scanner (pickle / safetensors)
-- **picklescan 통합** + 자체 opcode 워커: `GLOBAL`, `STACK_GLOBAL`, `REDUCE`,
-  `INST`, `OBJ`, `NEWOBJ` 등 실행 유발 opcode 탐지 (**unpickle 실행 금지**)
-- 위험 import 알로리스트/블록리스트 (`os`, `subprocess`, `builtins.eval` 등)
-- **safetensors validator:** 헤더 JSON 크기·오프셋·dtype 정합성, 텐서 영역 겹침 검사
-- **탐지:** 임의 코드 실행 가능 opcode, 위험 콜러블 참조
+### Stage 2 — Format Scanner (pickle / safetensors) — **M2 완료**
+- **picklescan 통합:** `scan_file_path`로 pickle global/opcode를 **unpickle 없이** 검사.
+  `SafetyLevel.Dangerous`(os.system·eval 등)→`CRITICAL`, `Suspicious`→`MEDIUM`,
+  `Innocuous`→무시. 규칙 id `pickle.<safety>-global`. scan_err→`HIGH`.
+  torch zip(.pt)·raw pickle(.pkl/.bin/.ckpt/.pth) 모두 처리.
+- **safetensors validator(자체 구현):** 헤더를 **바이트에서 직접 파싱**한다. 감사 대상
+  로더로 파일을 로드하지 않기 위해 `safetensors` 라이브러리를 쓰지 않음. 검사 항목:
+  헤더 길이 범위/오버사이즈(DoS), JSON 유효성, data_offsets 경계 초과, dtype·shape ↔
+  바이트 span 정합성, 텐서 영역 겹침(aliasing). 구조 위반→`HIGH`, 오버사이즈 헤더→`MEDIUM`.
+- **라우팅:** GGUF/미인식 포맷은 통과. **탐지 근거:** 임의 코드 실행 global, 크래프트된 헤더.
+- E2E 검증: 악성 pickle(`os.system`)→**BLOCK**. 단위+통합 테스트 통과(총 21 테스트).
 
 ### Stage 3 — Docker Sandbox (격리 로드 테스트)
 - 최소 이미지에서 `--network none`, `--read-only`, seccomp 커스텀 프로파일,
@@ -132,7 +137,7 @@ aibom/
 |---|----------|------|--------|
 | **M0** ✅ | 스캐폴드 & CI | repo·패키지·CI·CLI 골격 | `aibom --help`, 통과하는 파이프라인 스텁 |
 | **M1** 🟡 | Stage 5 스켈레톤 | 임시 BOM(dict) 생성 + verdict 집계 (cyclonedx-python-lib 미연동) | 유효한 JSON |
-| **M2** | Stage 2 | picklescan + safetensors validator | pickle 악성 샘플 탐지 |
+| **M2** ✅ | Stage 2 | picklescan + safetensors 헤더 validator | pickle 악성/변조 safetensors 탐지 |
 | **M3** ✅ | Stage 1 | **c4nary 통합** (Python API + Finding 매핑, severity 승격) | GGUF 룰 findings가 BOM에 반영 |
 | **M4** | Stage 3 | Docker 샌드박스 + strace | 격리 로드 리포트 |
 | **M5** | Stage 4 | 자체 트리거 추출기(`trigger_extract.py`) + adversarial probe (선택) | anomaly 스코어 |
