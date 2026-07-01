@@ -1,0 +1,6 @@
+# Normalize line endings. Files that run inside the Linux sandbox container must
+# stay LF regardless of the checkout platform, or the image/probe can break.
+* text=auto eol=lf
+sandbox/Dockerfile text eol=lf
+sandbox/*.py text eol=lf
+*.sh text eol=lf
