@@ -6,13 +6,18 @@ by isolation, not by avoidance. This is entirely new work: c4nary explicitly
 places weight/behavioral execution out of scope.
 
 Uses FGSM/PGD input perturbations to score output consistency/anomalies.
-c4nary's content-trigger rules (TPL020/021) *may* supply candidate trigger
-literals as probe inputs, but only if c4nary exposes them structurally — its
-current Finding has no structured trigger field, so that link is a pending
-c4nary-side enhancement (see DEVELOPMENT_PLAN §Stage 4). Opt-in via
-`--behavioral` and only when Docker is available; skips as INFO otherwise.
 
-TODO(M5): implement FGSM/PGD probe and anomaly scoring, gated by the sandbox.
+Trigger inputs are extracted by AI-BOM itself (decision: keep c4nary unmodified).
+`trigger_extract.py` reuses c4nary's `parse_gguf` to get the chat_template, then
+walks the Jinja AST for content-keyed conditions (`in` / `==` / `.startswith` /
+`.find`) and pulls their literal operands (e.g. 'deploy') as probe candidates —
+preferred over string-parsing c4nary's human-readable `detail`. The probe then
+compares model output with vs without each trigger inside the sandbox.
+
+Opt-in via `--behavioral` and only when Docker is available; skips as INFO
+otherwise.
+
+TODO(M5): implement trigger_extract + FGSM/PGD probe, gated by the sandbox.
 """
 
 from __future__ import annotations

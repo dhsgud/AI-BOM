@@ -105,9 +105,15 @@ aibom/
 > 내부에서만** 수행하며, "절대 실행 금지" 원칙은 격리로 보장한다. c4nary는 가중치
 > 실행을 **명시적으로 out-of-scope**로 규정하므로 이 단계의 로직은 전부 신규 개발이다.
 - FGSM/PGD 기반 adversarial probe로 입력 섭동에 대한 출력 일관성/anomaly 측정
-- **트리거 키워드 연동(제한적):** c4nary의 content-trigger 룰(TPL020/021)이 잡은
-  *리터럴 트리거 문자열*을 probe 입력 후보로 재사용 가능. 단 현재 c4nary `Finding`은
-  트리거 리터럴을 구조화해 노출하지 않음 → **c4nary 측 evidence 필드 확장 필요**(의존성/갭)
+- **트리거 추출(결정: AI-BOM 자체 구현, c4nary 무수정):**
+  - c4nary가 이미 공개하는 `parse_gguf`로 chat_template을 얻고, **Jinja AST를
+    직접 순회**해 content-키 조건(`in` / `==` / `.startswith` / `.find`)의
+    **리터럴 피연산자**를 트리거 후보로 추출한다 (예: `'deploy'`).
+  - 이 추출기는 `aibom/stages/trigger_extract.py`로 분리. c4nary의 사람용 설명문
+    (`detail`)을 문자열 파싱하는 방식은 취약하므로 **AST 재사용을 1순위**로 하고,
+    AST 접근이 막히면 fallback으로만 사용한다.
+  - probe: 각 트리거를 넣은 입력 vs 제거한 입력을 샌드박스 모델에 주고 출력 발산도로
+    백도어 활성 여부를 스코어링.
 - CPU 폴백 지원, `--behavioral` 플래그 + Docker 가용 시에만 활성 (비용·시간 큼)
 - 미구현/미가용 시 `WARNING`이 아니라 단순 skip(INFO)으로 처리해 오탐 방지
 
@@ -129,7 +135,7 @@ aibom/
 | **M2** | Stage 2 | picklescan + safetensors validator | pickle 악성 샘플 탐지 |
 | **M3** | Stage 1 | **c4nary 통합** (라이브러리/CLI `--json` 호출 + Finding 매핑) | GGUF 룰 findings가 BOM에 반영 |
 | **M4** | Stage 3 | Docker 샌드박스 + strace | 격리 로드 리포트 |
-| **M5** | Stage 4 | adversarial probe (선택) | anomaly 스코어 |
+| **M5** | Stage 4 | 자체 트리거 추출기(`trigger_extract.py`) + adversarial probe (선택) | anomaly 스코어 |
 | **M6** | 통합 & 문서 | E2E 테스트·샘플 코퍼스·릴리스 | v0.1.0 태그 |
 
 > **구현 순서 근거:** Stage 5→2 를 먼저 세워 "BOM 골격 + 확실한 위협 탐지"로
