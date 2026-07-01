@@ -26,20 +26,25 @@
 model.gguf / model.bin / model.safetensors
          │
          ▼
-  Stage 1  c4nary scan        GGUF AST 정적 분석 · SHA-256 + remote 비교 (헤더 fetch만)
+  Stage 1  c4nary scan        GGUF 템플릿 백도어/SSTI·메타·구조·토크나이저 정적 룰 (c4nary 통합)
          │ (non-GGUF)
          ▼
-  Stage 2  Format Scanner     picklescan opcode 분석 · safetensors 검증 · 실행코드 탐지
+  Stage 2  Format Scanner     picklescan opcode 분석 · safetensors 검증 · 실행코드 탐지 (신규)
          │
          ▼
   Stage 3  Docker Sandbox     --network none + seccomp · 격리 로드 · strace FS 모니터링
          │ (선택적)
          ▼
-  Stage 4  Behavioral Test    FGSM/PGD adversarial probe · 트리거 키워드 · anomaly 스코어
+  Stage 4  Behavioral Test    (샌드박스 내) FGSM/PGD adversarial probe · anomaly 스코어 (신규)
          │
          ▼
   Stage 5  AI-BOM Report      CycloneDX ML-BOM JSON · SAFE / WARNING / BLOCK
 ```
+
+> Stage 1은 GGUF 전용 정적 감사기 [`c4nary`](https://github.com/paraxaQQ/canary)를
+> 통합합니다(파서 재구현 아님). Stage 2(pickle/safetensors)와 Stage 4(가중치 행위
+> 분석)는 c4nary 범위 밖이라 신규 개발합니다. Stage 4는 유일하게 모델을 실행하므로
+> **반드시 Stage 3 샌드박스 안에서만** 동작합니다.
 
 각 단계의 상세 설계는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 개발 일정·마일스톤은 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)를 참조하세요.

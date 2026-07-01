@@ -37,6 +37,13 @@ Data flows through an ordered stage pipeline; every stage shares one contract.
 
 To add a **new stage/format**: implement `run()` returning a `StageResult`, register it in `pipeline.STAGES`, and route by artifact type. Rules are namespaced via `Finding.rule_id` (e.g. `stage2.stack-global`).
 
+## c4nary (Stage 1) — external dependency, do not reimplement
+
+Stage 1 integrates [c4nary](https://github.com/paraxaQQ/canary) (MIT), a **GGUF-only** static auditor, via its Python API or `canary scan --json`. Do **not** rewrite a GGUF parser. Key facts that shape the design:
+- c4nary covers **only GGUF** (template SSTI + behavioral-backdoor, metadata, structure, tokenizer, integrity rules). pickle/safetensors/weight execution are explicitly out of its scope — that's why Stage 2 (pickle/safetensors) and Stage 4 (behavioral) are new work here.
+- Its severity is `FAIL/WARN/INFO`; map to AI-BOM `Severity` as FAIL→HIGH (SSTI/injection→CRITICAL), WARN→MEDIUM/LOW, INFO→INFO. Preserve rule ids as `c4nary:<RULE_ID>`.
+- c4nary never renders templates or runs models; its SHA-256 is for local manifest drift, and `--remote` only range-fetches HuggingFace headers (no weights). Stage 4 is the sole stage that executes a model, and only inside the Stage 3 sandbox.
+
 ## Non-negotiable invariant
 
 **Never execute or render untrusted model content.** Analysis is static-only (opcode/AST inspection) or fully isolated (Stage 3 Docker sandbox: `--network none`, seccomp, `--cap-drop ALL`). Parsers must not `unpickle`, `eval`, or render Jinja templates. Any change touching a parser must preserve this — it is the core security property, not an optimization.

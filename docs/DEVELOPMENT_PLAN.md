@@ -32,9 +32,9 @@
 | 언어 | **Python 3.11+** | picklescan·safetensors·cyclonedx-python-lib 생태계 |
 | CLI | `typer` 또는 `click` | 서브커맨드·타입 검증 |
 | 데이터 모델 | `pydantic` v2 | 단계 간 결과 스키마 검증 |
-| Pickle 분석 | `picklescan` + 자체 opcode 워커 | 실행 없는 STACK_GLOBAL 탐지 |
-| SafeTensors | `safetensors` + 자체 헤더 검증 | 헤더 무결성/오프셋 검증 |
-| GGUF | 자체 파서(`c4nary`) | 렌더링/실행 없는 AST 추출 |
+| Pickle 분석 | `picklescan` + 자체 opcode 워커 | 실행 없는 STACK_GLOBAL 탐지 (c4nary 미제공, **신규**) |
+| SafeTensors | `safetensors` + 자체 헤더 검증 | 헤더 무결성/오프셋 검증 (c4nary 미제공, **신규**) |
+| GGUF | **`c4nary` (외부 의존성, MIT)** | 렌더링/실행 없는 템플릿·메타·구조·토크나이저 룰. 재구현하지 않고 통합 |
 | 샌드박스 | Docker SDK for Python + seccomp 프로파일 | `--network none` 격리 |
 | FS 모니터링 | `strace`(컨테이너 내) | 파일시스템 접근 탐지 |
 | BOM | `cyclonedx-python-lib` (ML-BOM) | 표준 준수 |
@@ -56,7 +56,7 @@ aibom/
 ├── models.py         # StageResult / Finding / Verdict pydantic 스키마
 ├── verdict.py        # 단계별 findings → SAFE/WARNING/BLOCK 집계
 └── stages/
-    ├── stage1_c4nary.py     # GGUF AST + SHA-256 + remote 헤더 비교
+    ├── stage1_c4nary.py     # c4nary 호출 → GGUF 템플릿/메타/구조/토크나이저 findings 매핑
     ├── stage2_format.py     # picklescan opcode + safetensors validator
     ├── stage3_sandbox.py    # Docker(--network none, seccomp) + strace
     ├── stage4_behavioral.py # FGSM/PGD probe + 트리거 키워드 + anomaly
@@ -71,14 +71,20 @@ aibom/
 
 ## 4. 단계별 상세 설계
 
-### Stage 1 — c4nary scan (GGUF 정적 분석)
-- **입력:** 모델 파일 경로 / URL
-- **동작:**
-  - GGUF 매직/버전/메타데이터 KV를 파싱하여 **AST** 구축 (렌더링/실행 없음)
-  - `template_ast`: chat_template 등 템플릿 필드를 파싱만 (Jinja 실행 금지)
-  - SHA-256 계산 → 원격 카탈로그와 비교 (**HTTP HEAD/Range 헤더 fetch만 허용**)
-- **탐지:** 매직 불일치, 비정상 KV, 원격 해시 불일치
-- **non-GGUF 포맷은 통과시켜 Stage 2로 위임**
+### Stage 1 — c4nary scan (GGUF 정적 분석) — **c4nary 통합 (재구현 아님)**
+> c4nary는 GGUF **전용** 감사기다. AI-BOM은 파서를 새로 만들지 않고 c4nary를
+> 라이브러리/CLI(`canary scan --json`)/MCP로 호출해 findings를 매핑한다.
+- **입력:** GGUF 파일 경로 (로컬) 또는 HuggingFace repo id/URL (`--remote`)
+- **동작 (c4nary가 수행):**
+  - GGUF 헤더 파싱 → 룰 실행: **템플릿(TPL)**·**메타데이터(MET)**·**토크나이저(TOK)**·
+    **구조(STR)**·**무결성(INT)**. 절대 렌더링/실행 없음, jinja2는 AST 추출 용도만.
+  - 핵심 차별점: **행위 백도어(silent-hijack) 정적 탐지** — content-키 분기,
+    content-gated instruction injection, invisible/bidi 코드포인트 등 (TPL020-027)
+  - `--remote`: HuggingFace **헤더만 range-fetch**(메타+템플릿+텐서맵), 가중치 미다운로드.
+    이때 STR*·whole-file 무결성은 스킵됨.
+  - SHA-256(파일/템플릿)은 **로컬 manifest drift 탐지**용 (원격 해시 카탈로그 비교 아님).
+- **AI-BOM 매핑:** c4nary `FAIL/WARN/INFO` → AI-BOM `Severity`(아래 §9 매핑표)
+- **non-GGUF 포맷은 통과시켜 Stage 2로 위임** (c4nary는 pickle/safetensors 미지원)
 
 ### Stage 2 — Format Scanner (pickle / safetensors)
 - **picklescan 통합** + 자체 opcode 워커: `GLOBAL`, `STACK_GLOBAL`, `REDUCE`,
@@ -94,14 +100,22 @@ aibom/
   syscall 모니터링
 - **탐지:** 예기치 않은 파일 쓰기, 네트워크 시도, 프로세스 생성
 
-### Stage 4 — Behavioral Test (선택)
-- FGSM/PGD 기반 adversarial probe로 입력 섭동에 대한 출력 일관성 측정
-- c4nary로 추출한 **트리거 키워드** 후보를 주입하여 anomaly 스코어링
-- CPU 폴백 지원, `--behavioral` 플래그로만 활성 (비용·시간 큼)
+### Stage 4 — Behavioral Test (선택, 연구성) — **주의: c4nary가 제공하지 않음**
+> ⚠️ 이 단계는 유일하게 **모델을 실제 실행**한다. 따라서 반드시 **Stage 3 샌드박스
+> 내부에서만** 수행하며, "절대 실행 금지" 원칙은 격리로 보장한다. c4nary는 가중치
+> 실행을 **명시적으로 out-of-scope**로 규정하므로 이 단계의 로직은 전부 신규 개발이다.
+- FGSM/PGD 기반 adversarial probe로 입력 섭동에 대한 출력 일관성/anomaly 측정
+- **트리거 키워드 연동(제한적):** c4nary의 content-trigger 룰(TPL020/021)이 잡은
+  *리터럴 트리거 문자열*을 probe 입력 후보로 재사용 가능. 단 현재 c4nary `Finding`은
+  트리거 리터럴을 구조화해 노출하지 않음 → **c4nary 측 evidence 필드 확장 필요**(의존성/갭)
+- CPU 폴백 지원, `--behavioral` 플래그 + Docker 가용 시에만 활성 (비용·시간 큼)
+- 미구현/미가용 시 `WARNING`이 아니라 단순 skip(INFO)으로 처리해 오탐 방지
 
 ### Stage 5 — AI-BOM Report
 - 모든 단계 findings + 아티팩트 메타데이터를 **CycloneDX ML-BOM(JSON)** 로 직렬화
-- `c4nary report.py` 확장: components(모델/데이터셋), evidence, verdict 필드
+- **정정:** c4nary `report.py`는 단순 `Finding` dataclass + human/JSON 렌더러이며
+  CycloneDX가 아니다. 따라서 "확장"이 아니라 **c4nary Finding → CycloneDX 매핑**을
+  구현한다 (components=모델, `vulnerabilities`/`evidence`에 findings, 최종 verdict).
 - 최종 판정: 단계별 최고 심각도 → `SAFE / WARNING / BLOCK`
 
 ---
@@ -113,7 +127,7 @@ aibom/
 | **M0** | 스캐폴드 & CI | repo·패키지·CI·CLI 골격 | `aibom --help`, 통과하는 파이프라인 스텁 |
 | **M1** | Stage 5 스켈레톤 | 빈 BOM 생성 + verdict 집계 | 유효한 CycloneDX JSON |
 | **M2** | Stage 2 | picklescan + safetensors validator | pickle 악성 샘플 탐지 |
-| **M3** | Stage 1 | GGUF 파서 + SHA-256 + remote 비교 | GGUF AST 리포트 |
+| **M3** | Stage 1 | **c4nary 통합** (라이브러리/CLI `--json` 호출 + Finding 매핑) | GGUF 룰 findings가 BOM에 반영 |
 | **M4** | Stage 3 | Docker 샌드박스 + strace | 격리 로드 리포트 |
 | **M5** | Stage 4 | adversarial probe (선택) | anomaly 스코어 |
 | **M6** | 통합 & 문서 | E2E 테스트·샘플 코퍼스·릴리스 | v0.1.0 태그 |
@@ -145,8 +159,39 @@ aibom/
 
 ---
 
-## 8. 다음 단계 (즉시 착수)
+## 8. c4nary 통합 상세 (검증 완료: paraxaQQ/canary)
+
+### 9.1 c4nary 실측 사실
+- **범위:** GGUF **전용**. pickle·safetensors·가중치 값은 다루지 않음(명시적 out-of-scope)
+- **의존성:** `jinja2` 하나(AST 추출 전용, 렌더링 금지). Python 3.10+, **MIT 라이선스**
+- **인터페이스:** ① Python API(`parse_gguf`, `analyze_template/metadata/tokenizer/structure`,
+  `compare_manifest`) ② CLI `canary scan --json` ③ MCP 서버(`c4nary-mcp`)
+- **룰 패밀리:** `TPL`(템플릿 SSTI+행위백도어), `STR`(구조), `MET`(메타), `TOK`(토크나이저),
+  `INT`(무결성). 각 finding = `(rule_id, severity, title, detail, location)`
+- **severity:** `FAIL / WARN / INFO`. 종료코드 0/1(warn)/2(fail)/>2(error)
+- **불변식:** 렌더링·실행 금지, 코어 오프라인, 읽기 전용, 결정적(byte-identical), 설명가능
+
+### 9.2 통합 방식
+- **채택:** c4nary를 **의존성으로 추가**(`pip install c4nary[remote]`)하고 Python API 우선 호출,
+  격리가 필요하면 `canary scan --json` 서브프로세스. GGUF 파서를 재구현하지 않음.
+- **버전 고정:** `c4nary>=0.1,<0.2` (룰 id/JSON 스키마 안정성 확보 전까지 상한 고정)
+
+### 9.3 severity 매핑 (c4nary → AI-BOM)
+| c4nary | AI-BOM `Severity` | 근거 |
+|--------|-------------------|------|
+| `FAIL` | `HIGH` (SSTI/injection 계열은 `CRITICAL`) | 확정적 위험 구성물 → BLOCK |
+| `WARN` | `MEDIUM` 또는 `LOW` | 휴리스틱 리뷰 프롬프트 → WARNING |
+| `INFO` | `INFO` | 정보성 |
+> c4nary rule_id는 `bom.rule_id` 네임스페이스에 `c4nary:TPL021` 형태로 보존한다.
+
+### 9.4 라이선스 정합성
+- c4nary=MIT, AI-BOM=Apache-2.0. MIT 의존성을 Apache-2.0 프로젝트에서 사용하는 것은 호환.
+  코드 **벤더링 시** c4nary MIT 고지 유지 필요. 기본은 pip 의존성으로만 사용.
+
+## 9. 다음 단계 (즉시 착수)
 1. `M0` — 패키지 스캐폴드·CLI·CI 완성 (본 커밋에서 골격 제공)
-2. `models.py` 스키마 확정 (`StageResult`, `Finding`, `Verdict`)
+2. `models.py` 스키마 확정 (`StageResult`, `Finding`, `Verdict`) + c4nary severity 매핑 유틸
 3. `M1` — Stage 5 CycloneDX 스켈레톤 + verdict 집계
-4. 악성/양성 샘플 코퍼스 구축 시작
+4. `M3`(Stage 1)을 우선순위 상향 검토 — c4nary 통합은 파서 신규개발이 아니라
+   의존성 연동이므로 M2(pickle)보다 빠르게 가치 실현 가능
+5. 악성/양성 샘플 코퍼스 구축 시작 (c4nary `tests/fixtures/*.jinja` 참고)
